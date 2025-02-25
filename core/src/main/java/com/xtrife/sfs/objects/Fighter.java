@@ -84,6 +84,10 @@ public class Fighter {
         return position;
     }
 
+    public float getLife() {
+        return life;
+    }
+
     public void getReady(float positionX, float positionY) {
         state = renderState = State.IDLE;
         stateTime = renderStateTime = 0f; // shorthand to set both vars to 0f
@@ -129,7 +133,7 @@ public class Fighter {
             currentFrame.getRegionWidth() * GlobalVariables.WORLD_SCALE,
             currentFrame.getRegionHeight() * GlobalVariables.WORLD_SCALE,
             facing, 1, 0);
-        batch.setColor(1,1,1,1); // stop coloring
+        batch.setColor(1, 1, 1, 1); // stop coloring
     }
 
     public void update(float delta) {
@@ -146,8 +150,11 @@ public class Fighter {
             // if fighter is walking, move in the direction of the movement vector
             position.x += movementDirection.x * MOVEMENT_SPEED * delta;
             position.y += movementDirection.y * MOVEMENT_SPEED * delta;
-        } else if ((state == State.PUNCH && punchAnimation.isAnimationFinished(stateTime)) ||
-            (state == State.KICK && kickAnimation.isAnimationFinished(stateTime))) { // Go back to idling or walking after attack
+        } else if (
+            // Go back to idling or walking after attacking or getting hit
+            (state == State.PUNCH && punchAnimation.isAnimationFinished(stateTime)) ||
+            (state == State.KICK && kickAnimation.isAnimationFinished(stateTime)) ||
+            (state == State.HURT && hurtAnimation.isAnimationFinished(stateTime))) {
             // if the animation has finished and movement direction is set, start walking, otherwise idle
             if (movementDirection.x != 0 || movementDirection.y != 0) {
                 state = State.WALK;
@@ -182,6 +189,7 @@ public class Fighter {
     public void moveLeft() {
         setMovement(-1, movementDirection.y); // leave Y alone to move on X axis only
     }
+
     public void moveRight() {
         setMovement(1, movementDirection.y);
     }
@@ -243,17 +251,71 @@ public class Fighter {
     public void punch() {
         if (state == State.IDLE || state == State.WALK) {
             changeState(State.PUNCH);
+            // just started attacking, no contact made yet
+            madeContact = false;
         }
     }
 
     public void kick() {
         if (state == State.IDLE || state == State.WALK) {
             changeState(State.KICK);
+            // just started attacking, no contact made yet
+            madeContact = false;
         }
+    }
+
+    public void makeContact() {
+        madeContact = true;
+    }
+
+    public boolean hasMadeContact() {
+        return madeContact;
     }
 
     public boolean isAttacking() {
         return state == State.PUNCH || state == State.KICK;
+    }
+
+    public boolean isAttackActive() {
+        // attack is only active if the fighter has not yet made contact already (no multi hit)
+        // and the attack animation not JUST started or is ALMOST finished
+        if (hasMadeContact()) {
+            return false;
+        } else if (state == State.PUNCH) {
+            // hit only during outside first third and last third animation duration
+            return stateTime > punchAnimation.getAnimationDuration() * 0.33f && stateTime < punchAnimation.getAnimationDuration() * 0.66f;
+        } else if (state == State.KICK) {
+            return stateTime > kickAnimation.getAnimationDuration() * 0.33f && stateTime < kickAnimation.getAnimationDuration() * 0.66f;
+        } else {
+            return false; // not in attack state
+        }
+    }
+
+    public void getHit(float damage) {
+        if (state == State.HURT || state == State.WIN || state == State.LOSE) return;
+
+        // reduce HP by full damage or partial damage if blocking
+        life -= state == State.BLOCK ? damage * BLOCK_DAMAGE_FACTOR : damage;
+
+        if (life <= 0f) {
+            lose(); // defeated
+        } else if (state != State.BLOCK) {
+            // if not blocking, go to hurt state
+            changeState(State.HURT);
+        }
+    }
+
+    public void lose() {
+        changeState(State.LOSE);
+        life = 0f;
+    }
+
+    public boolean hasLost() {
+        return state == State.LOSE;
+    }
+
+    public void win() {
+        changeState(State.WIN);
     }
 
     private void initializeBlockAnimation(AssetManager assetManager) {
@@ -261,36 +323,43 @@ public class Fighter {
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         blockAnimation = new Animation<>(0.05f, frames); // duration in seconds for each frame
     }
+
     private void initializeHurtAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.HURT_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         hurtAnimation = new Animation<>(0.03f, frames); // duration in seconds for each frame
     }
+
     private void initializeIdleAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.IDLE_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         idleAnimation = new Animation<>(0.1f, frames); // duration in seconds for each frame
     }
+
     private void initializeKickAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.KICK_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         kickAnimation = new Animation<>(0.05f, frames); // duration in seconds for each frame
     }
+
     private void initializeLoseAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.LOSE_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         loseAnimation = new Animation<>(0.05f, frames); // duration in seconds for each frame
     }
+
     private void initializePunchAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.PUNCH_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         punchAnimation = new Animation<>(0.05f, frames); // duration in seconds for each frame
     }
+
     private void initializeWalkAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.WALK_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
         walkAnimation = new Animation<>(0.08f, frames); // duration in seconds for each frame
     }
+
     private void initializeWinAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.WIN_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
