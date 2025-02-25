@@ -87,6 +87,15 @@ public class GameScreen implements Screen {
     private void update(float delta) {
         game.player.update(delta); // delta is the elapsed time since last screen render
         game.opponent.update(delta);
+
+        // make sure fighters are facing each other
+        if (game.player.getPosition().x <= game.opponent.getPosition().x) {
+            game.player.faceRight();
+            game.opponent.faceLeft();
+        } else {
+            game.player.faceLeft();
+            game.opponent.faceRight();
+        }
     }
 
     @Override
