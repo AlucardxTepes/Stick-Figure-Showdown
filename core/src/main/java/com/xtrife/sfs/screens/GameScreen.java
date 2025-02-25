@@ -176,6 +176,19 @@ public class GameScreen implements Screen, InputProcessor {
             game.player.moveDown();
         }
 
+        // attack / block
+        if (keycode == Input.Keys.SPACE) {
+            game.player.block();
+        } else if (keycode == Input.Keys.K) {
+            game.player.kick();
+        } else if (keycode == Input.Keys.J) {
+            game.player.punch();
+        }
+
+
+
+
+
         return true; // means we have handled the key input here
     }
 
@@ -193,6 +206,12 @@ public class GameScreen implements Screen, InputProcessor {
         } else if (keycode == Input.Keys.DOWN || keycode == Input.Keys.S) {
             game.player.stopMovingDown();
         }
+
+        // stop blocking on key release
+        if (keycode == Input.Keys.SPACE) {
+            game.player.stopBlocking();
+        }
+
 
         return true;
     }
