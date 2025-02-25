@@ -19,7 +19,7 @@ public class Fighter {
     public static final int FRAME_ROWS = 2, FRAME_COLS = 3;
 
     // how fast a fighter can move
-    public static final float MOVEMENT_SPEED = 10f;
+    public static final float MOVEMENT_SPEED = 15f;
 
     // max life
     public static final float MAX_LIFE = 100f;

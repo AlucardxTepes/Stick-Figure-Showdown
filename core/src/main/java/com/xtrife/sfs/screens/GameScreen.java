@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.xtrife.sfs.Main;
@@ -22,6 +23,13 @@ public class GameScreen implements Screen, InputProcessor {
     // background/ring
     private Texture backgroundTexture;
     private Texture frontRopeTexture;
+
+    // ring boundaries
+    private static final float RING_MIN_X = 18f;
+    private static final float RING_MAX_X = 144f;
+    private static final float RING_MIN_Y = 11f;
+    private static final float RING_MAX_Y = 50f;
+    private static final float RING_SLOPE = 3.16f;
 
     // fighters
     private static final float PLAYER_START_POSITION_X = 60f;
@@ -75,17 +83,24 @@ public class GameScreen implements Screen, InputProcessor {
         // draw the fighters
         renderFighters();
 
+        // draw the front ropes layer after righters so that it is rendered over them
+        game.batch.draw(frontRopeTexture, 0, 0, frontRopeTexture.getWidth() * GlobalVariables.WORLD_SCALE, frontRopeTexture.getHeight() * GlobalVariables.WORLD_SCALE);
+
         // end drawing
         game.batch.end();
 
     }
 
     private void renderFighters() {
-        // draw player
-        game.player.render(game.batch);
+        // use the y coordinates to determine which fighter sprite is in front
+        if (game.player.getPosition().y > game.opponent.getPosition().y) {
+            game.player.render(game.batch);  // draw player first
+            game.opponent.render(game.batch);
+        } else {
+            game.opponent.render(game.batch);  // draw opponent first
+            game.player.render(game.batch);
+        }
 
-        // draw opponent
-        game.opponent.render(game.batch);
     }
 
     private void update(float delta) {
@@ -99,6 +114,23 @@ public class GameScreen implements Screen, InputProcessor {
         } else {
             game.player.faceLeft();
             game.opponent.faceRight();
+        }
+
+        // keep fighters within ring boundaries
+        keepWithinRingBounds(game.player.getPosition());
+        keepWithinRingBounds(game.opponent.getPosition());
+    }
+
+    private void keepWithinRingBounds(Vector2 position) {
+        if (position.y < RING_MIN_Y ) {
+            position.y = RING_MIN_Y;
+        } else if (position.y > RING_MAX_Y) {
+            position.y = RING_MAX_Y;
+        }
+        if (position.x < position.y / RING_SLOPE + RING_MIN_X ) {
+            position.x = position.y / RING_SLOPE +  RING_MIN_X;
+        } else if (position.x > position.y / -RING_SLOPE + RING_MAX_X ) {
+            position.x = position.y / -RING_SLOPE + RING_MAX_X;
         }
     }
 
