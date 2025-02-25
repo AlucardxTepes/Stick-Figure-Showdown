@@ -1,5 +1,8 @@
 package com.xtrife.sfs.screens;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -11,7 +14,7 @@ import com.xtrife.sfs.resources.GlobalVariables;
 /**
  * Created by 9S on 2/24/2025 - 10:28 PM.
  */
-public class GameScreen implements Screen {
+public class GameScreen implements Screen, InputProcessor {
 
     private final Main game;
     private final ExtendViewport viewport;
@@ -49,7 +52,8 @@ public class GameScreen implements Screen {
 
     @Override
     public void show() {
-
+        // have this GameScreen handle inputs
+        Gdx.input.setInputProcessor(this);
     }
 
     @Override
@@ -125,4 +129,74 @@ public class GameScreen implements Screen {
 
     }
 
+    @Override
+    public boolean keyDown(int keycode) {
+        // check for player movement key
+        if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
+            game.player.moveLeft();
+        } else if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
+            game.player.moveRight();
+        }
+        // separate if for vertical movement to allow players to move both horiz or vert simultaneously
+        if (keycode == Input.Keys.UP || keycode == Input.Keys.W) {
+            game.player.moveUp();
+        } else if (keycode == Input.Keys.DOWN || keycode == Input.Keys.S) {
+            game.player.moveDown();
+        }
+
+        return true; // means we have handled the key input here
+    }
+
+    @Override
+    public boolean keyUp(int keycode) {
+        // stop movement on key release
+        if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
+            game.player.stopMovingLeft();
+        } else if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
+            game.player.stopMovingRight();
+        }
+        // separate if for vertical movement to allow players to move both horiz or vert simultaneously
+        if (keycode == Input.Keys.UP || keycode == Input.Keys.W) {
+            game.player.stopMovingUp();
+        } else if (keycode == Input.Keys.DOWN || keycode == Input.Keys.S) {
+            game.player.stopMovingDown();
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean keyTyped(char character) {
+        return false;
+    }
+
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) {
+        return false;
+    }
+
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) {
+        return false;
+    }
+
+    @Override
+    public boolean scrolled(float amountX, float amountY) {
+        return false;
+    }
 }

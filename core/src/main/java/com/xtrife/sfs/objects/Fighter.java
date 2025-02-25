@@ -141,6 +141,12 @@ public class Fighter {
             renderState = state;
             renderStateTime = stateTime;
         }
+
+        if (state == State.WALK) {
+            // if fighter is walking, move in the direction of the movement vector
+            position.x += movementDirection.x * MOVEMENT_SPEED * delta;
+            position.y += movementDirection.y * MOVEMENT_SPEED * delta;
+        }
     }
 
     public void faceLeft() {
@@ -149,6 +155,59 @@ public class Fighter {
 
     public void faceRight() {
         facing = 1;
+    }
+
+    private void changeState(State newState) {
+        state = newState;
+        stateTime = 0f;
+    }
+
+    private void setMovement(float x, float y) {
+        movementDirection.set(x, y);
+        if (state == State.WALK && x == 0 && y == 0) {
+            changeState(State.IDLE);
+        } else if (state == State.IDLE && (x != 0 || y != 0)) {
+            changeState(State.WALK);
+        }
+    }
+
+    public void moveLeft() {
+        setMovement(-1, movementDirection.y); // leave Y alone to move on X axis only
+    }
+    public void moveRight() {
+        setMovement(1, movementDirection.y);
+    }
+
+    public void moveUp() {
+        setMovement(movementDirection.x, 1);
+    }
+
+    public void moveDown() {
+        setMovement(movementDirection.x, -1);
+    }
+
+    public void stopMovingLeft() {
+        if (movementDirection.x == -1) {
+            setMovement(0, movementDirection.y);
+        }
+    }
+
+    public void stopMovingRight() {
+        if (movementDirection.x == 1) {
+            setMovement(0, movementDirection.y);
+        }
+    }
+
+    public void stopMovingUp() {
+        if (movementDirection.y == 1) {
+            setMovement(movementDirection.x, 0);
+        }
+    }
+
+    public void stopMovingDown() {
+        if (movementDirection.y == -1) {
+            setMovement(movementDirection.x, 0);
+        }
     }
 
     private void initializeBlockAnimation(AssetManager assetManager) {
