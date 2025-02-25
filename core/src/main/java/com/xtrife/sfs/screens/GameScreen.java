@@ -20,6 +20,12 @@ public class GameScreen implements Screen {
     private Texture backgroundTexture;
     private Texture frontRopeTexture;
 
+    // fighters
+    private static final float PLAYER_START_POSITION_X = 60f;
+    private static final float OPPONENT_START_POSITION_X = 100f;
+    private static final float FIGHTER_START_POSITION_Y = 35f;
+
+
     public GameScreen(Main game) {
         this.game = game;
 
@@ -29,6 +35,10 @@ public class GameScreen implements Screen {
 
         // create the game area
         createGameArea();
+
+        // ready fighters
+        game.player.getReady(PLAYER_START_POSITION_X, FIGHTER_START_POSITION_Y);
+        game.opponent.getReady(OPPONENT_START_POSITION_X, FIGHTER_START_POSITION_Y);
     }
 
     private void createGameArea() {
@@ -46,6 +56,9 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         ScreenUtils.clear(0, 0, 0, 1);
 
+        // update the game
+        update(delta);
+
         // set the sprite batch to use our camera
         game.batch.setProjectionMatrix(viewport.getCamera().combined);
 
@@ -55,9 +68,25 @@ public class GameScreen implements Screen {
         // draw the background at half its image size
         game.batch.draw(backgroundTexture, 0, 0, backgroundTexture.getWidth() * GlobalVariables.WORLD_SCALE, backgroundTexture.getHeight() * GlobalVariables.WORLD_SCALE);
 
+        // draw the fighters
+        renderFighters();
+
         // end drawing
         game.batch.end();
 
+    }
+
+    private void renderFighters() {
+        // draw player
+        game.player.render(game.batch);
+
+        // draw opponent
+        game.opponent.render(game.batch);
+    }
+
+    private void update(float delta) {
+        game.player.update(delta); // delta is the elapsed time since last screen render
+        game.opponent.update(delta);
     }
 
     @Override

@@ -4,10 +4,12 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector2;
 import com.xtrife.sfs.Main;
 import com.xtrife.sfs.resources.Assets;
+import com.xtrife.sfs.resources.GlobalVariables;
 
 /**
  * Created by 9S on 2/24/2025 - 11:31 PM.
@@ -78,6 +80,63 @@ public class Fighter {
         initializeWinAnimation(game.assets.manager);
     }
 
+    public void getReady(float positionX, float positionY) {
+        state = renderState = State.IDLE;
+        stateTime = renderStateTime = 0f; // shorthand to set both vars to 0f
+        position.set(positionX, positionY);
+        movementDirection.set(0, 0);
+        life = MAX_LIFE;
+        madeContact = false;
+    }
+
+    public void render(SpriteBatch batch) {
+        // get the current animation frame
+        TextureRegion currentFrame;
+        switch (renderState) {
+            case BLOCK:
+                currentFrame = blockAnimation.getKeyFrame(stateTime, true);
+                break;
+            case HURT:
+                currentFrame = hurtAnimation.getKeyFrame(stateTime, false);
+                break;
+            case IDLE:
+                currentFrame = idleAnimation.getKeyFrame(stateTime, true);
+                break;
+            case KICK:
+                currentFrame = kickAnimation.getKeyFrame(stateTime, false);
+                break;
+            case LOSE:
+                currentFrame = loseAnimation.getKeyFrame(stateTime, false);
+                break;
+            case PUNCH:
+                currentFrame = punchAnimation.getKeyFrame(stateTime, false);
+                break;
+            case WALK:
+                currentFrame = walkAnimation.getKeyFrame(stateTime, true);
+                break;
+            default:
+                currentFrame = winAnimation.getKeyFrame(stateTime, true);
+                break;
+        }
+
+        batch.setColor(color);
+        batch.draw(currentFrame, position.x, position.y,
+            currentFrame.getRegionWidth() * GlobalVariables.WORLD_SCALE,
+            currentFrame.getRegionHeight() * GlobalVariables.WORLD_SCALE);
+        batch.setColor(1,1,1,1); // stop coloring
+    }
+
+    public void update(float delta) {
+        // increment state time by delta time
+        stateTime += delta;
+
+        // update render state if delta > 0 (game is not paused)
+        if (delta > 0) {
+            renderState = state;
+            renderStateTime = stateTime;
+        }
+    }
+
     private void initializeBlockAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.BLOCK_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
@@ -91,7 +150,7 @@ public class Fighter {
     private void initializeIdleAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.IDLE_SPRITE_SHEET);
         TextureRegion[] frames = getAnimationFrames(spriteSheet);
-        idleAnimation = new Animation<>(0.01f, frames); // duration in seconds for each frame
+        idleAnimation = new Animation<>(0.1f, frames); // duration in seconds for each frame
     }
     private void initializeKickAnimation(AssetManager assetManager) {
         Texture spriteSheet = assetManager.get(Assets.KICK_SPRITE_SHEET);
@@ -123,7 +182,7 @@ public class Fighter {
         TextureRegion[][] tmp = TextureRegion.split(spriteSheet, spriteSheet.getWidth() / FRAME_COLS,
             spriteSheet.getHeight() / FRAME_ROWS);
         // Convert 2D array to 1D array
-        TextureRegion[] frames = new TextureRegion[FRAME_ROWS * FRAME_ROWS];
+        TextureRegion[] frames = new TextureRegion[FRAME_COLS * FRAME_ROWS];
         int index = 0;
         for (int i = 0; i < FRAME_ROWS; i++) {
             for (int j = 0; j < FRAME_COLS; j++) {

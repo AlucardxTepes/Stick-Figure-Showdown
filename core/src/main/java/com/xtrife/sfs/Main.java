@@ -1,8 +1,10 @@
 package com.xtrife.sfs;
 
 import com.badlogic.gdx.Game;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.xtrife.sfs.objects.Fighter;
 import com.xtrife.sfs.resources.Assets;
 import com.xtrife.sfs.screens.GameScreen;
 
@@ -16,6 +18,9 @@ public class Main extends Game {
     // screens
     public GameScreen gameScreen;
 
+    // fighters
+    public Fighter player, opponent;
+
 
     @Override
     public void create() {
@@ -25,6 +30,10 @@ public class Main extends Game {
         // load all assets
         assets.load(); // assets are loaded asynchronously
         assets.manager.finishLoading(); // blocks until all assets are done loading
+
+        // init fighters
+        player = new Fighter(this, "El Tipo", new Color(1f, 0.2f, 0.2f, 1f));
+        opponent = new Fighter(this, "El Otro Tipo", new Color(0.25f, 0.7f, 1f, 1f));
 
         // init game screen and switch to it
         gameScreen = new GameScreen(this);
