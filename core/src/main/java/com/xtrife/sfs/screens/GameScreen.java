@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Align;
@@ -32,13 +33,15 @@ public class GameScreen implements Screen, InputProcessor {
     private final ExtendViewport viewport;
 
     // game
-    private enum GameState { RUNNING, PAUSED, GAME_OVER }
+    private enum GameState {RUNNING, PAUSED, GAME_OVER}
+
     private GameState gameState;
     private GlobalVariables.Difficulty difficulty = GlobalVariables.Difficulty.EASY;
 
 
     // rounds
-    private enum RoundState { STARTING, IN_PROGRESS, ENDING }
+    private enum RoundState {STARTING, IN_PROGRESS, ENDING}
+
     private RoundState roundState;
     private float roundStateTime;
     private static final float START_ROUND_DELAY = 2f; // 2 sec delay
@@ -84,6 +87,20 @@ public class GameScreen implements Screen, InputProcessor {
     private Sprite continueButtonSprite;
     private Sprite pauseButtonSprite;
     private static final float PAUSE_BUTTON_MARGIN = 1.5f;
+
+    // opponent AI
+    private float opponentAiTimer;
+    private boolean opponentAiMakingcontactDecision;
+    private static final float OPPONENT_AI_CONTACT_DECISION_DELAY_EASY = 1f;
+    private static final float OPPONENT_AI_CONTACT_DECISION_DELAY_MEDIUM = 0.07f;
+    private static final float OPPONENT_AI_CONTACT_DECISION_DELAY_HARD = 0.01f;
+    private static final float OPPONENT_AI_BLOCK_CHANCE = 0.4f; // decision chance
+    private static final float OPPONENT_AI_ATTACK_CHANCE = 0.8f; // 8 out of 10 times
+    private static final float OPPONENT_AI_NON_CONTACT_DECISION_DELAY = 0.5f;
+    private boolean opponentAiPursuingPlayer;
+    private static final float OPPONENT_AI_PURSUE_CHANCE_EASY = 0.2f; // 20% of time
+    private static final float OPPONENT_AI_PURSUE_CHANCE_MEDIUM = 0.5f;
+    private static final float OPPONENT_AI_PURSUE_CHANCE_HARD = 1f; // opponent is always going after the player
 
 
     public GameScreen(Main game) {
@@ -403,7 +420,7 @@ public class GameScreen implements Screen, InputProcessor {
         String text = roundsWon > roundsLost ? "YOU WON!" : "YOU LOST!";
         largeFont.draw(game.batch, text, viewport.getWorldWidth() / 2f,
             playAgainButtonSprite.getY() + playAgainButtonSprite.getHeight() +
-            textMarginBottom + largeFont.getCapHeight(), 0, Align.center, false);
+                textMarginBottom + largeFont.getCapHeight(), 0, Align.center, false);
     }
 
     private void renderPauseOverlay() {
@@ -483,15 +500,20 @@ public class GameScreen implements Screen, InputProcessor {
             roundTimer -= delta;
             if (roundTimer <= 0f) {
                 // timout win decided by highest HP
-                if(game.player.getLife() >= game.opponent.getLife()) {
+                if (game.player.getLife() >= game.opponent.getLife()) {
                     winRound();
                 } else {
                     loseRound();
                 }
             }
+
+            // perform opponent AI action
+            performOpponentAi(delta);
+
             // round in progress. Check if fighters are within contact distance
             if (areWithinContactDistance(game.player.getPosition(), game.opponent.getPosition())) {
                 if (game.player.isAttackActive()) {
+                    // PLAYER HITSCAN LOGIC
                     // if within contact distance AND while attacking, apply hit
                     game.opponent.getHit(Fighter.HIT_STRENGTH);
 
@@ -508,20 +530,38 @@ public class GameScreen implements Screen, InputProcessor {
                     if (game.opponent.hasLost()) {
                         winRound();
                     }
+                } else if (game.opponent.isAttackActive()) {
+                    // OPPONENT HITSCAN LOGIC
+                    // if within contact distance AND while attacking, apply hit
+                    game.player.getHit(Fighter.HIT_STRENGTH);
+
+                    if (game.player.isBlocking()) {
+                        game.audioManager.playSound(Assets.BLOCK_SOUND);
+                    } else {
+                        game.audioManager.playSound(Assets.HIT_SOUND);
+                    }
+
+                    // deactivate opponent attack after contact
+                    game.opponent.makeContact();
+
+                    // check if player has lost
+                    if (game.player.hasLost()) {
+                        loseRound();
+                    }
                 }
             }
         }
     }
 
     private void keepWithinRingBounds(Vector2 position) {
-        if (position.y < RING_MIN_Y ) {
+        if (position.y < RING_MIN_Y) {
             position.y = RING_MIN_Y;
         } else if (position.y > RING_MAX_Y) {
             position.y = RING_MAX_Y;
         }
-        if (position.x < position.y / RING_SLOPE + RING_MIN_X ) {
-            position.x = position.y / RING_SLOPE +  RING_MIN_X;
-        } else if (position.x > position.y / -RING_SLOPE + RING_MAX_X ) {
+        if (position.x < position.y / RING_SLOPE + RING_MIN_X) {
+            position.x = position.y / RING_SLOPE + RING_MIN_X;
+        } else if (position.x > position.y / -RING_SLOPE + RING_MAX_X) {
             position.x = position.y / -RING_SLOPE + RING_MAX_X;
         }
     }
@@ -531,6 +571,172 @@ public class GameScreen implements Screen, InputProcessor {
         float xDistance = Math.abs(position1.x - position2.x); // we want positive values only
         float yDistance = Math.abs(position1.y - position2.y);
         return xDistance <= FIGHTER_CONTACT_DISTANCE_X && yDistance <= FIGHTER_CONTACT_DISTANCE_Y;
+    }
+
+    private void performOpponentAi(float delta) {
+        // check if opponent is making a contact decision (attack, block, etc.)
+        if (opponentAiMakingcontactDecision) {
+            if (game.opponent.isBlocking()) {
+                // stop blocking if not within contact distance, if player isnt attacking or player has attacked and already made contact
+                if (!areWithinContactDistance(game.player.getPosition(), game.opponent.getPosition()) ||
+                    !game.player.isAttacking() || game.player.hasMadeContact()) {
+                    game.opponent.stopBlocking();
+                }
+            } else if (!game.opponent.isAttacking()) {
+                // if opponent isnt currently attacking, check if within contact distance
+                if (areWithinContactDistance(game.player.getPosition(), game.opponent.getPosition())) {
+                    if (opponentAiTimer <= 0f) {
+                        // make an AI contact decision after delay timer is up
+                        opponentAiMakeContactDecision();
+                    } else {
+                        // decrease the opponent AI timer by delta time
+                        opponentAiTimer -= delta;
+                    }
+                } else {
+                    // no decision if not within contact distance
+                    opponentAiMakingcontactDecision = false;
+                }
+            }
+        } else {
+            if (areWithinContactDistance(game.player.getPosition(), game.opponent.getPosition())) {
+                // if within contact AND AI not currently making a decision
+                opponentAiMakeContactDecision();
+            } else {
+                if (opponentAiTimer <= 0f) {
+                    // pursue player or move to a random direction
+                    float pursueChance = difficulty == GlobalVariables.Difficulty.EASY ? OPPONENT_AI_PURSUE_CHANCE_EASY :
+                        difficulty == GlobalVariables.Difficulty.MEDIUM ? OPPONENT_AI_PURSUE_CHANCE_MEDIUM :
+                            OPPONENT_AI_PURSUE_CHANCE_HARD;
+                    if (MathUtils.random() <= pursueChance) {
+                        // opponent is pursuing player
+                        opponentAiPursuingPlayer = true;
+                        // move in the direction of the player
+                        opponentAiMoveTowardPlayer();
+                    } else {
+                        opponentAiPursuingPlayer = false;
+                        // move in a random direction
+                        opponentAiMoveRandomly();
+                    }
+                    // set timer to non-contact decision delay
+                    opponentAiTimer = OPPONENT_AI_NON_CONTACT_DECISION_DELAY;
+                } else {
+                    // if opponent is pursuing player, move in direction of the player
+                    if (opponentAiPursuingPlayer) {
+                        opponentAiMoveTowardPlayer();
+                    }
+                    opponentAiTimer -= delta; // decrease opponent AI Timer
+                }
+            }
+        }
+    }
+
+    private void opponentAiMakeContactDecision() {
+        opponentAiMakingcontactDecision = true;
+
+        //check if player is attacking
+        if (game.player.isAttacking()) {
+            // block or move away if attack hasnt made contact yet
+            if (!game.player.hasMadeContact()) {
+                if (MathUtils.random() <= OPPONENT_AI_BLOCK_CHANCE) {
+                    game.opponent.block();
+                } else {
+                    opponentAiMoveAwayFromPlayer();
+                }
+            }
+        } else {
+            // attack or move away if player isnt attacking
+            if (MathUtils.random() <= OPPONENT_AI_ATTACK_CHANCE) {
+                if (MathUtils.random(1) == 0) {
+                    game.opponent.punch();
+                } else { // 50/50 chance to punch or kick
+                    game.opponent.kick();
+                }
+            } else {
+                opponentAiMoveAwayFromPlayer();
+            }
+        }
+
+        // set the opponent AI timer based on difficulty
+        switch (difficulty) {
+            case EASY:
+                opponentAiTimer = OPPONENT_AI_CONTACT_DECISION_DELAY_EASY;
+                break;
+            case MEDIUM:
+                opponentAiTimer = OPPONENT_AI_CONTACT_DECISION_DELAY_MEDIUM;
+                break;
+            case HARD:
+            default:
+                opponentAiTimer = OPPONENT_AI_CONTACT_DECISION_DELAY_HARD;
+        }
+    }
+
+    private void opponentAiMoveTowardPlayer() {
+        Vector2 playerPos = game.player.getPosition();
+        Vector2 opponentPos = game.opponent.getPosition();
+
+        // check X position
+        if (opponentPos.x > playerPos.x + FIGHTER_CONTACT_DISTANCE_X) {
+            game.opponent.moveLeft();
+        } else if (opponentPos.x < playerPos.x - FIGHTER_CONTACT_DISTANCE_X) {
+            game.opponent.moveRight();
+        } else {
+            game.opponent.stopMovingLeft();
+            game.opponent.stopMovingRight();
+        }
+        // check Y position
+        if (opponentPos.y < playerPos.y + FIGHTER_CONTACT_DISTANCE_Y) {
+            game.opponent.moveUp();
+        } else if (opponentPos.y > playerPos.y - FIGHTER_CONTACT_DISTANCE_Y) {
+            game.opponent.moveDown();
+        } else {
+            game.opponent.stopMovingUp();
+            game.opponent.stopMovingDown();
+        }
+    }
+
+    private void opponentAiMoveRandomly() {
+        // random x move
+        switch (MathUtils.random(2)) {
+            case 0:
+                game.opponent.moveLeft();
+                break;
+            case 1:
+                game.opponent.moveRight();
+                break;
+            case 2:
+            default:
+                game.opponent.stopMovingLeft();
+                game.opponent.stopMovingRight();
+        }
+        // random y move
+        switch (MathUtils.random(2)) {
+            case 0:
+                game.opponent.moveUp();
+                break;
+            case 1:
+                game.opponent.moveDown();
+                break;
+            case 2:
+            default:
+                game.opponent.stopMovingUp();
+                game.opponent.stopMovingDown();
+        }
+    }
+
+    private void opponentAiMoveAwayFromPlayer() {
+        Vector2 playerPos = game.player.getPosition();
+        Vector2 opponentPos = game.opponent.getPosition();
+
+        if (opponentPos.x > playerPos.x) {
+            game.opponent.moveRight();
+        } else {
+            game.opponent.moveLeft();
+        }
+        if (opponentPos.y > playerPos.y) {
+            game.opponent.moveUp();
+        } else {
+            game.opponent.moveDown();
+        }
     }
 
     @Override
@@ -590,6 +796,20 @@ public class GameScreen implements Screen, InputProcessor {
         } else if (keycode == Input.Keys.M) {
             // togle music on or off
             game.audioManager.toggleMusic();
+        } else if (keycode == Input.Keys.N) {
+            // switch difficulty
+            switch (difficulty) {
+                case EASY:
+                    difficulty = GlobalVariables.Difficulty.MEDIUM;
+                    break;
+                case MEDIUM:
+                    difficulty = GlobalVariables.Difficulty.HARD;
+                    break;
+                case HARD:
+                default:
+                    difficulty = GlobalVariables.Difficulty.EASY;
+                    break;
+            }
         } else {
             // Enable fight controls
             if (roundState == RoundState.IN_PROGRESS) {
