@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.xtrife.sfs.objects.Fighter;
 import com.xtrife.sfs.resources.Assets;
+import com.xtrife.sfs.resources.AudioManager;
 import com.xtrife.sfs.screens.GameScreen;
 
 /**
@@ -16,6 +17,7 @@ public class Main extends Game {
     public SpriteBatch batch;
     public ShapeRenderer shapeRenderer;
     public Assets assets;
+    public AudioManager audioManager;
 
     // screens
     public GameScreen gameScreen;
@@ -33,6 +35,10 @@ public class Main extends Game {
         // load all assets
         assets.load(); // assets are loaded asynchronously
         assets.manager.finishLoading(); // blocks until all assets are done loading
+
+        // init audio manager
+        audioManager = new AudioManager(assets.manager);
+        audioManager.playMusic();
 
         // init fighters
         player = new Fighter(this, "El Tipo", new Color(1f, 0.2f, 0.2f, 1f));

@@ -4,6 +4,8 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.assets.loaders.FileHandleResolver;
 import com.badlogic.gdx.assets.loaders.TextureLoader;
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver;
+import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
@@ -53,6 +55,7 @@ public class Assets {
         // load all assets
         loadGameplayAssets();
         loadFonts();
+        loadAudio();
     }
 
     private void loadGameplayAssets() {
@@ -72,6 +75,15 @@ public class Assets {
         manager.load(LOSE_SPRITE_SHEET, Texture.class, parameter);
         manager.load(GAMEPLAY_BUTTONS_ATLAS, TextureAtlas.class);
         manager.load(BLOOD_ATLAS, TextureAtlas.class);
+    }
+
+    private void loadAudio() {
+        manager.load(BLOCK_SOUND, Sound.class);
+        manager.load(BOO_SOUND, Sound.class);
+        manager.load(CLICK_SOUND, Sound.class);
+        manager.load(CHEER_SOUND, Sound.class);
+        manager.load(HIT_SOUND, Sound.class);
+        manager.load(MUSIC, Music.class);
     }
 
     private void loadFonts() {
