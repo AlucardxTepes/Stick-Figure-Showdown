@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
@@ -44,6 +45,8 @@ public class GameScreen implements Screen, InputProcessor {
     private int roundsWon = 0, roundsLost = 0;
     private static final float MAX_ROUND_TIME = 99.99f;
     private float roundTimer = MAX_ROUND_TIME;
+    private static final float CRITICAL_ROUND_TIME = 10f;
+    private static final Color CRITICAL_ROUND_TIME_COLOR = Color.RED;
 
 
     // fonts
@@ -268,9 +271,13 @@ public class GameScreen implements Screen, InputProcessor {
             healthbarBackgroundPadding - healthbarPadding, fighterNamePosY, 0, Align.right, false);
 
         // draw the round timer
+        if (roundTimer < CRITICAL_ROUND_TIME) {
+            mediumFont.setColor(CRITICAL_ROUND_TIME_COLOR);
+        }
         mediumFont.draw(game.batch, String.format(Locale.getDefault(), "%02d", (int) roundTimer), // pad numbers less than 10 with a leading 0
-            viewport.getWorldWidth() / 2f, viewport.getWorldHeight() - HUDMargin,
-            0, Align.center, false);
+            viewport.getWorldWidth() / 2f - mediumFont.getSpaceXadvance() * 2.3f, // makes digits not move around due to size diff
+            viewport.getWorldHeight() - HUDMargin);
+        mediumFont.setColor(DEFAULT_FONT_COLOR); // reset font color in case it was turned red due to crit round timer
 
     }
 
@@ -400,35 +407,46 @@ public class GameScreen implements Screen, InputProcessor {
 
     @Override
     public boolean keyDown(int keycode) {
-        if (roundState == RoundState.IN_PROGRESS) {
-            // check for player movement key
-            if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
-                game.player.moveLeft();
-            } else if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
-                game.player.moveRight();
+        if (keycode == Input.Keys.ENTER) {
+            if (gameState == GameState.RUNNING) {
+                // skip round delay
+                if (roundState == RoundState.STARTING) {
+                    roundStateTime = START_ROUND_DELAY;
+                } else if (roundState == RoundState.ENDING) {
+                    roundStateTime = END_ROUND_DELAY;
+                }
+            } else if (gameState == GameState.GAME_OVER) {
+                // if game over and key is pressed, restart the game
+                startGame();
             }
-            // separate if for vertical movement to allow players to move both horiz or vert simultaneously
-            if (keycode == Input.Keys.UP || keycode == Input.Keys.W) {
-                game.player.moveUp();
-            } else if (keycode == Input.Keys.DOWN || keycode == Input.Keys.S) {
-                game.player.moveDown();
+        } else {
+            // Enable fight controls
+
+            if (roundState == RoundState.IN_PROGRESS) {
+                // check for player movement key
+                if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
+                    game.player.moveLeft();
+                } else if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
+                    game.player.moveRight();
+                }
+                // separate if for vertical movement to allow players to move both horiz or vert simultaneously
+                if (keycode == Input.Keys.UP || keycode == Input.Keys.W) {
+                    game.player.moveUp();
+                } else if (keycode == Input.Keys.DOWN || keycode == Input.Keys.S) {
+                    game.player.moveDown();
+                }
+            }
+
+
+            // attack / block
+            if (keycode == Input.Keys.SPACE) {
+                game.player.block();
+            } else if (keycode == Input.Keys.K) {
+                game.player.kick();
+            } else if (keycode == Input.Keys.J) {
+                game.player.punch();
             }
         }
-
-
-        // attack / block
-        if (keycode == Input.Keys.SPACE) {
-            game.player.block();
-        } else if (keycode == Input.Keys.K) {
-            game.player.kick();
-        } else if (keycode == Input.Keys.J) {
-            game.player.punch();
-        }
-
-
-
-
-
         return true; // means we have handled the key input here
     }
 
@@ -463,7 +481,22 @@ public class GameScreen implements Screen, InputProcessor {
 
     @Override
     public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-        return false;
+        // convert from top left pixels into world coordinates
+        Vector3 position = new Vector3(screenX, screenY, 0);
+        viewport.getCamera().unproject(position, viewport.getScreenX(), viewport.getScreenY(),
+            viewport.getScreenWidth(), viewport.getScreenHeight()); // unproject affects position var value
+
+        if (gameState == GameState.RUNNING) {
+            if (roundState == RoundState.STARTING) {
+                // if the round is starting and screen has been clicked/touched, skip start round delay
+                roundStateTime = START_ROUND_DELAY;
+            } else if (roundState == RoundState.ENDING) {
+                roundStateTime = END_ROUND_DELAY; // same for round ending delay
+            }
+        }
+
+
+        return true; // let system know our code has handled the key event
     }
 
     @Override
