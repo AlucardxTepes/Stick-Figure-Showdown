@@ -3,6 +3,7 @@ package com.xtrife.sfs;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.xtrife.sfs.objects.Fighter;
 import com.xtrife.sfs.resources.Assets;
@@ -13,6 +14,7 @@ import com.xtrife.sfs.screens.GameScreen;
  */
 public class Main extends Game {
     public SpriteBatch batch;
+    public ShapeRenderer shapeRenderer;
     public Assets assets;
 
     // screens
@@ -25,6 +27,7 @@ public class Main extends Game {
     @Override
     public void create() {
         batch = new SpriteBatch();
+        shapeRenderer = new ShapeRenderer();
         assets = new Assets();
 
         // load all assets
@@ -50,5 +53,6 @@ public class Main extends Game {
     public void dispose() {
         batch.dispose();
         assets.dispose();
+        shapeRenderer.dispose();
     }
 }
