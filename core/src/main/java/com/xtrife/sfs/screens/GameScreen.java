@@ -5,8 +5,11 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
@@ -75,6 +78,13 @@ public class GameScreen implements Screen, InputProcessor {
     private static final float FIGHTER_CONTACT_DISTANCE_X = 17f;
     private static final float FIGHTER_CONTACT_DISTANCE_Y = 3f;
 
+    // menu buttons
+    private Sprite playAgainButtonSprite;
+    private Sprite mainMenuButtonSprite;
+    private Sprite continueButtonSprite;
+    private Sprite pauseButtonSprite;
+    private static final float PAUSE_BUTTON_MARGIN = 1.5f;
+
 
     public GameScreen(Main game) {
         this.game = game;
@@ -85,11 +95,10 @@ public class GameScreen implements Screen, InputProcessor {
 
         // create the game area
         createGameArea();
+        createButtons();
 
         // set up the fonts
         setupFonts();
-
-        startGame();
     }
 
     private void createGameArea() {
@@ -115,12 +124,38 @@ public class GameScreen implements Screen, InputProcessor {
         largeFont.setUseIntegerPositions(false);
     }
 
+    private void createButtons() {
+        // get button texture atlas from asset manager
+        TextureAtlas buttonTextureAtlas = game.assets.manager.get(Assets.GAMEPLAY_BUTTONS_ATLAS);
+
+        // END OF ROUND MENU
+        // create the 'play again' button
+        playAgainButtonSprite = new Sprite(buttonTextureAtlas.findRegion("PlayAgainButton")); // this text is inside the atlas file
+        playAgainButtonSprite.setSize(playAgainButtonSprite.getWidth() * GlobalVariables.WORLD_SCALE,
+            playAgainButtonSprite.getHeight() * GlobalVariables.WORLD_SCALE);
+        // create Main menu button
+        mainMenuButtonSprite = new Sprite(buttonTextureAtlas.findRegion("MainMenuButton"));
+        mainMenuButtonSprite.setSize(mainMenuButtonSprite.getWidth() * GlobalVariables.WORLD_SCALE,
+            mainMenuButtonSprite.getHeight() * GlobalVariables.WORLD_SCALE);
+
+        // PAUSE MENU
+        // create continue menu button
+        continueButtonSprite = new Sprite(buttonTextureAtlas.findRegion("ContinueButton"));
+        continueButtonSprite.setSize(continueButtonSprite.getWidth() * GlobalVariables.WORLD_SCALE,
+            continueButtonSprite.getHeight() * GlobalVariables.WORLD_SCALE);
+        // create pause menu button
+        pauseButtonSprite = new Sprite(buttonTextureAtlas.findRegion("PauseButton"));
+        pauseButtonSprite.setSize(pauseButtonSprite.getWidth() * GlobalVariables.WORLD_SCALE,
+            pauseButtonSprite.getHeight() * GlobalVariables.WORLD_SCALE);
+    }
+
     @Override
     public void show() {
         // have this GameScreen handle inputs
         Gdx.input.setInputProcessor(this);
 
         // start the game
+        startGame();
     }
 
     private void startGame() {
@@ -130,6 +165,14 @@ public class GameScreen implements Screen, InputProcessor {
         // start round 1
         currentRound = 1;
         startRound();
+    }
+
+    private void pauseGame() {
+        gameState = GameState.PAUSED;
+    }
+
+    private void resumeGame() {
+        gameState = GameState.RUNNING;
     }
 
     private void startRound() {
@@ -166,8 +209,8 @@ public class GameScreen implements Screen, InputProcessor {
     public void render(float delta) {
         ScreenUtils.clear(0, 0, 0, 1);
 
-        // update the game
-        update(delta);
+        // update the game if not paused
+        update(gameState == GameState.RUNNING ? delta : 0f); // 0f freezes the game
 
         // set the sprite batch and the shape renderer to use our camera
         game.batch.setProjectionMatrix(viewport.getCamera().combined);
@@ -188,9 +231,22 @@ public class GameScreen implements Screen, InputProcessor {
         // draw the HUD
         renderHud();
 
-        // if the round starting, draw the start round text
-        if (roundState == RoundState.STARTING) {
-            renderStartRoundText();
+        // draw pause menu
+        renderPauseButtons();
+
+        // handle Round Over
+        if (gameState == GameState.GAME_OVER) {
+            renderGameOverOverlay();
+        } else {
+            // if the round starting, draw the start round text
+            if (roundState == RoundState.STARTING) {
+                renderStartRoundText();
+            }
+
+            // if the game is paused, draw pause overlay
+            if (gameState == GameState.PAUSED) {
+                renderPauseOverlay();
+            }
         }
 
         // end drawing
@@ -292,6 +348,85 @@ public class GameScreen implements Screen, InputProcessor {
             0, Align.center, false);
     }
 
+    private void renderPauseButtons() {
+        pauseButtonSprite.setPosition(viewport.getWorldWidth() - PAUSE_BUTTON_MARGIN - pauseButtonSprite.getWidth(),
+            PAUSE_BUTTON_MARGIN);
+        pauseButtonSprite.draw(game.batch);
+    }
+
+    private void renderGameOverOverlay() {
+        // darken screen and add transparency
+        game.batch.end();
+
+        // enable texture blending so transparency displays textures behind it
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        // set dark semi transparent overlay
+        game.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        game.shapeRenderer.setColor(0, 0, 0, 0.7f);
+        game.shapeRenderer.rect(0, 0, viewport.getWorldWidth(), viewport.getWorldHeight());
+        game.shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND); // remove blending
+        game.batch.begin();
+
+        // calculate layout dimensions placing buttons from bottom to top
+        float textMarginBottom = 2f;
+        float buttonSpacing = 0.5f;
+        float layoutHeight = largeFont.getCapHeight() + textMarginBottom + playAgainButtonSprite.getHeight() +
+            buttonSpacing + mainMenuButtonSprite.getHeight();
+        float layoutPositionY = viewport.getWorldHeight() / 2f - layoutHeight / 2f;
+
+        // draw the buttons
+        mainMenuButtonSprite.setPosition(viewport.getWorldWidth() / 2f - mainMenuButtonSprite.getWidth() / 2f, layoutPositionY);
+        mainMenuButtonSprite.draw(game.batch);
+        playAgainButtonSprite.setPosition(viewport.getWorldWidth() / 2f - playAgainButtonSprite.getWidth() / 2f,
+            layoutPositionY + mainMenuButtonSprite.getHeight() + buttonSpacing);
+        playAgainButtonSprite.draw(game.batch);
+
+        // draw the end of fight text
+        String text = roundsWon > roundsLost ? "YOU WON!" : "YOU LOST!";
+        largeFont.draw(game.batch, text, viewport.getWorldWidth() / 2f,
+            playAgainButtonSprite.getY() + playAgainButtonSprite.getHeight() +
+            textMarginBottom + largeFont.getCapHeight(), 0, Align.center, false);
+    }
+
+    private void renderPauseOverlay() {
+        // darken screen and add transparency
+        game.batch.end();
+
+        // enable texture blending so transparency displays textures behind it
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        // set dark semi transparent overlay
+        game.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        game.shapeRenderer.setColor(0, 0, 0, 0.7f);
+        game.shapeRenderer.rect(0, 0, viewport.getWorldWidth(), viewport.getWorldHeight());
+        game.shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND); // remove blending
+        game.batch.begin();
+
+        // calculate layout dimensions placing buttons from bottom to top
+        float textMarginBottom = 2f;
+        float buttonSpacing = 0.5f;
+        float layoutHeight = largeFont.getCapHeight() + textMarginBottom + continueButtonSprite.getHeight() +
+            buttonSpacing + mainMenuButtonSprite.getHeight();
+        float layoutPositionY = viewport.getWorldHeight() / 2f - layoutHeight / 2f;
+
+        // draw the buttons
+        mainMenuButtonSprite.setPosition(viewport.getWorldWidth() / 2f - mainMenuButtonSprite.getWidth() / 2f, layoutPositionY);
+        mainMenuButtonSprite.draw(game.batch);
+        continueButtonSprite.setPosition(viewport.getWorldWidth() / 2f - continueButtonSprite.getWidth() / 2f,
+            layoutPositionY + mainMenuButtonSprite.getHeight() + buttonSpacing);
+        continueButtonSprite.draw(game.batch);
+
+        // draw the pause menu top text
+        largeFont.draw(game.batch, "GAME PAUSED", viewport.getWorldWidth() / 2f,
+            continueButtonSprite.getY() + continueButtonSprite.getHeight() +
+                textMarginBottom + largeFont.getCapHeight(), 0, Align.center, false);
+    }
+
     private void update(float delta) {
         if (roundState == RoundState.STARTING && roundStateTime >= START_ROUND_DELAY) {
             // if start round delay has been reached, start the fight
@@ -387,7 +522,10 @@ public class GameScreen implements Screen, InputProcessor {
 
     @Override
     public void pause() {
-
+        // pause game when minimized
+        if (gameState == GameState.RUNNING) {
+            pauseGame();
+        }
     }
 
     @Override
@@ -418,6 +556,13 @@ public class GameScreen implements Screen, InputProcessor {
             } else if (gameState == GameState.GAME_OVER) {
                 // if game over and key is pressed, restart the game
                 startGame();
+            }
+        } else if ((gameState == GameState.RUNNING || gameState == GameState.PAUSED) && keycode == Input.Keys.P) {
+            // if the game is running or paused and P key is pressed, pause or resume game
+            if (gameState == GameState.RUNNING) {
+                pauseGame();
+            } else {
+                resumeGame();
             }
         } else {
             // Enable fight controls
@@ -487,11 +632,23 @@ public class GameScreen implements Screen, InputProcessor {
             viewport.getScreenWidth(), viewport.getScreenHeight()); // unproject affects position var value
 
         if (gameState == GameState.RUNNING) {
-            if (roundState == RoundState.STARTING) {
+            if (pauseButtonSprite.getBoundingRectangle().contains(position.x, position.y)) {
+                // pause btn was clicked
+                pauseGame();
+            } else if (roundState == RoundState.STARTING) {
                 // if the round is starting and screen has been clicked/touched, skip start round delay
                 roundStateTime = START_ROUND_DELAY;
             } else if (roundState == RoundState.ENDING) {
                 roundStateTime = END_ROUND_DELAY; // same for round ending delay
+            }
+        } else {
+            if (gameState == GameState.GAME_OVER &&
+                playAgainButtonSprite.getBoundingRectangle().contains(position.x, position.y)) {
+                // 'play again button' clicked
+                startGame();
+            } else if (gameState == GameState.PAUSED && continueButtonSprite.getBoundingRectangle().contains(position.x, position.y)) {
+                // if game is paused and continue button clicked, resume game
+                resumeGame();
             }
         }
 
